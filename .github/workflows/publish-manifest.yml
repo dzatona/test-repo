@@ -51,8 +51,8 @@ jobs:
 
           sed -i.bak \
             -e "s|__APP_ID__|test-app|g" \
-            -e "s|__REPO_URL__|${{ github.repository }}|g" \
-            -e "s|__COMMIT_SHA__|${{ github.sha }}|g" \
+            -e "s|__REPO_URL__|${REPO_URL}|g" \
+            -e "s|__COMMIT_SHA__|${COMMIT_SHA}|g" \
             -e "s|__BUILD_TS__|${BUILD_TS}|g" \
             -e "s|__REPO__|${{ github.repository }}|g" \
             -e "s|__RUN_ID__|${{ github.run_id }}|g" \
