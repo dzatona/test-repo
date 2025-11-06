@@ -1,0 +1,73 @@
+name: Publish Manifest
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate Thunderwind manifest.json
+        run: |
+          REPO_URL="https://github.com/${{ github.repository }}"
+          COMMIT_SHA="${{ github.sha }}"
+          BUILD_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          cat > manifest.json << 'MANIFEST_JSON'
+          {
+            "app_id": "__APP_ID__",
+            "manifest": {
+              "repository": "__REPO_URL__",
+              "commit": "__COMMIT_SHA__",
+              "build_timestamp": "__BUILD_TS__",
+              "sbom_hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "build_attestation": {
+                "issuer": "github.com",
+                "reference": "https://github.com/__REPO__/actions/runs/__RUN_ID__"
+              },
+              "tee_target": "tdx",
+              "measurement": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "build_env": "github-actions",
+              "spec_version": "1.0.0",
+              "capabilities": [],
+              "signature": {
+                "key_id": "placeholder",
+                "value": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+              }
+            }
+          }
+          MANIFEST_JSON
+
+          sed -i.bak \
+            -e "s|__APP_ID__|test-app|g" \
+            -e "s|__REPO_URL__|${{ github.repository }}|g" \
+            -e "s|__COMMIT_SHA__|${{ github.sha }}|g" \
+            -e "s|__BUILD_TS__|${BUILD_TS}|g" \
+            -e "s|__REPO__|${{ github.repository }}|g" \
+            -e "s|__RUN_ID__|${{ github.run_id }}|g" \
+            manifest.json
+
+          echo "Generated manifest.json:"
+          cat manifest.json
+
+      - name: Publish manifest to Thunderwind
+        run: |
+          TOKEN=$(curl -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://thunderwind.net" | jq -r '.value')
+
+          curl -X POST https://api.thunderwind.net/api/v1/publish/manifest \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "Idempotency-Key: ${{ github.run_id }}-${{ github.run_attempt }}" \
+            -d @manifest.json
