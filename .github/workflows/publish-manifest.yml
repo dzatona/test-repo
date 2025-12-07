@@ -58,7 +58,7 @@ jobs:
 
           cat > manifest.json << EOF
           {
-            "app_id": "test-app",
+            "app_id": "hello-world",
             "manifest": {
               "repository": "https://github.com/${{ github.repository }}",
               "commit": "${{ github.sha }}",
