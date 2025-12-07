@@ -1,4 +1,4 @@
-name: Publish Manifest
+name: Thunderwind Publish Manifest
 on:
   push:
     branches: [main]
@@ -13,31 +13,53 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  publish:
+  publish-manifest:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate Thunderwind manifest.json
-        run: |
-          REPO_URL="https://github.com/${{ github.repository }}"
-          COMMIT_SHA="${{ github.sha }}"
-          BUILD_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
 
-          cat > manifest.json << 'MANIFEST_JSON'
+      - name: Compute measurement
+        id: measurement
+        run: |
+          echo "Building Go application"
+          CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "-buildid=" -o app main.go
+
+          if [ ! -f "app" ]; then
+            echo "Error: Go build did not produce binary"
+            exit 1
+          fi
+
+          MEASUREMENT=$(sha256sum app | awk '{print $1}')
+          TEE_TARGET="tdx"
+
+          # Export to GitHub output
+          echo "measurement=$MEASUREMENT" >> $GITHUB_OUTPUT
+          echo "tee_target=$TEE_TARGET" >> $GITHUB_OUTPUT
+          echo "Computed measurement: $MEASUREMENT"
+
+      - name: Generate manifest.json
+        run: |
+          TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          cat > manifest.json << EOF
           {
-            "app_id": "__APP_ID__",
+            "app_id": "test-app",
             "manifest": {
-              "repository": "__REPO_URL__",
-              "commit": "__COMMIT_SHA__",
-              "build_timestamp": "__BUILD_TS__",
-              "sbom_hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "repository": "https://github.com/${{ github.repository }}",
+              "commit": "${{ github.sha }}",
+              "build_timestamp": "$TS",
+              "sbom_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
               "build_attestation": {
                 "issuer": "github.com",
-                "reference": "https://github.com/__REPO__/actions/runs/__RUN_ID__"
+                "reference": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
               },
-              "tee_target": "tdx",
-              "measurement": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "tee_target": "${{ steps.measurement.outputs.tee_target }}",
+              "measurement": "${{ steps.measurement.outputs.measurement }}",
               "build_env": "github-actions",
               "spec_version": "1.0.0",
               "capabilities": [],
@@ -47,26 +69,17 @@ jobs:
               }
             }
           }
-          MANIFEST_JSON
-
-          sed -i.bak \
-            -e "s|__APP_ID__|test-app|g" \
-            -e "s|__REPO_URL__|${REPO_URL}|g" \
-            -e "s|__COMMIT_SHA__|${COMMIT_SHA}|g" \
-            -e "s|__BUILD_TS__|${BUILD_TS}|g" \
-            -e "s|__REPO__|${{ github.repository }}|g" \
-            -e "s|__RUN_ID__|${{ github.run_id }}|g" \
-            manifest.json
+          EOF
 
           echo "Generated manifest.json:"
           cat manifest.json
 
-      - name: Publish manifest to Thunderwind
+      - name: Publish manifest
         run: |
-          TOKEN=$(curl -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+          TOKEN=$(curl -fsSH "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://thunderwind.net" | jq -r '.value')
 
-          curl -X POST https://api.thunderwind.net/api/v1/publish/manifest \
+          curl -fsSX POST https://api.thunderwind.net/api/v1/publish/manifest \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
             -H "Idempotency-Key: ${{ github.run_id }}-${{ github.run_attempt }}" \
