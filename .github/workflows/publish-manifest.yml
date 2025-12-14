@@ -72,11 +72,7 @@ jobs:
               "measurement": "${{ steps.measurement.outputs.measurement }}",
               "build_env": "github-actions",
               "spec_version": "1.0.0",
-              "capabilities": [],
-              "signature": {
-                "key_id": "placeholder",
-                "value": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
-              }
+              "capabilities": []
             }
           }
           EOF
