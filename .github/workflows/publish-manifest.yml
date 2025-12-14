@@ -63,16 +63,13 @@ jobs:
               "repository": "https://github.com/${{ github.repository }}",
               "commit": "${{ github.sha }}",
               "build_timestamp": "$TS",
-              "sbom_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
               "build_attestation": {
                 "issuer": "github.com",
                 "reference": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
               },
               "tee_target": "${{ steps.measurement.outputs.tee_target }}",
               "measurement": "${{ steps.measurement.outputs.measurement }}",
-              "build_env": "github-actions",
-              "spec_version": "1.0.0",
-              "capabilities": []
+              "build_env": "github-actions"
             }
           }
           EOF
