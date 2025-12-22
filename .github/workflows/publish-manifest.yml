@@ -80,9 +80,9 @@ jobs:
       - name: Publish manifest
         run: |
           TOKEN=$(curl -fsSH "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://thunderwind.net" | jq -r '.value')
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://thunderwind.io" | jq -r '.value')
 
-          curl -fsSX POST https://api.thunderwind.net/api/v1/publish/manifest \
+          curl -fsSX POST https://api.thunderwind.io/api/v1/publish/manifest \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
             -H "Idempotency-Key: ${{ github.run_id }}-${{ github.run_attempt }}" \
